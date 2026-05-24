@@ -15,6 +15,7 @@ import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LoggerUtils
 import app.aaps.core.interfaces.logging.UserEntryLogger
 import app.aaps.core.interfaces.maintenance.FileListProvider
+import app.aaps.core.interfaces.maintenance.MaintenanceLogExporter
 import app.aaps.core.interfaces.nsclient.NSSettingsStatus
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.plugin.PluginDescription
@@ -63,7 +64,7 @@ class MaintenancePlugin @Inject constructor(
     private val uel: UserEntryLogger,
     private val cloudStorageManager: CloudStorageManager,
     private val exportOptionsDialog: ExportOptionsDialog
-) : PluginBase(
+) : MaintenanceLogExporter, PluginBase(
     PluginDescription()
         .mainType(PluginType.GENERAL)
         .fragmentClass(MaintenanceFragment::class.java.name)
@@ -83,9 +84,9 @@ class MaintenancePlugin @Inject constructor(
         val zipFile = fileListProvider.ensureTempDirExists()?.createFile("application/zip", constructName()) ?: return
         aapsLogger.debug("zipFile: ${zipFile.name}")
         val zip = zipLogs(zipFile, logs)
-        
+
         // Check export destination preference (master switch or individual setting)
-        if ((exportOptionsDialog.isLogCloudEnabled()) && 
+        if ((exportOptionsDialog.isLogCloudEnabled()) &&
             cloudStorageManager.isCloudStorageActive()) {
             // Send to Cloud Drive
             sendLogsToCloudDrive(zip)
@@ -97,6 +98,43 @@ class MaintenancePlugin @Inject constructor(
             aapsLogger.debug("sending emailIntent")
             context.startActivity(emailIntent)
         }
+    }
+
+    /**
+     * Non-interactive log export, used by AAPS Automation's ActionLogsExport.
+     *
+     * Like sendLogs() but:
+     *   - never falls back to the email Intent (no UI activity to launch)
+     *   - returns success/failure as a boolean so the calling action can
+     *     surface an appropriate notification
+     *   - requires cloud storage to be configured AND log-cloud enabled;
+     *     otherwise returns false and the caller can log/notify.
+     *
+     * Companion to importExportPrefs.exportSharedPreferencesNonInteractive
+     * used by ActionSettingsExport. Same lifecycle expectations.
+     *
+     * @return true if the zip was produced and the cloud upload was kicked
+     *         off; false on any precondition or zip failure.
+     */
+    override fun sendLogsNonInteractive(): Boolean {
+        if (!exportOptionsDialog.isLogCloudEnabled() || !cloudStorageManager.isCloudStorageActive()) {
+            aapsLogger.warn(app.aaps.core.interfaces.logging.LTag.CORE,
+                "sendLogsNonInteractive: cloud log export not enabled; aborting.")
+            return false
+        }
+        val amount = preferences.get(IntKey.MaintenanceLogsAmount)
+        val logs = getLogFiles(amount)
+        val zipFile = fileListProvider.ensureTempDirExists()?.createFile("application/zip", constructName())
+        if (zipFile == null) {
+            aapsLogger.error(app.aaps.core.interfaces.logging.LTag.CORE,
+                "sendLogsNonInteractive: could not create zip file in temp dir.")
+            return false
+        }
+        aapsLogger.debug(app.aaps.core.interfaces.logging.LTag.CORE,
+            "sendLogsNonInteractive: zipFile=${zipFile.name}, log count=${logs.size}")
+        val zip = zipLogs(zipFile, logs)
+        sendLogsToCloudDrive(zip)
+        return true
     }
 
     fun deleteLogs(keep: Int) {

@@ -14,6 +14,7 @@ import app.aaps.plugins.automation.actions.ActionProfileSwitchPercent
 import app.aaps.plugins.automation.actions.ActionRunAutotune
 import app.aaps.plugins.automation.actions.ActionSMBChange
 import app.aaps.plugins.automation.actions.ActionSendSMS
+import app.aaps.plugins.automation.actions.ActionLogsExport
 import app.aaps.plugins.automation.actions.ActionSettingsExport
 import app.aaps.plugins.automation.actions.ActionStartTempTarget
 import app.aaps.plugins.automation.actions.ActionStopProcessing
@@ -109,6 +110,7 @@ abstract class AutomationModule {
     @ContributesAndroidInjector abstract fun actionNotificationInjector(): ActionNotification
     @ContributesAndroidInjector abstract fun actionAlarmInjector(): ActionAlarm
     @ContributesAndroidInjector abstract fun actionSettingsExportInjector(): ActionSettingsExport
+    @ContributesAndroidInjector abstract fun actionLogsExportInjector(): ActionLogsExport
     @ContributesAndroidInjector abstract fun actionCarePortalEventInjector(): ActionCarePortalEvent
     @ContributesAndroidInjector abstract fun actionProfileSwitchInjector(): ActionProfileSwitch
     @ContributesAndroidInjector abstract fun actionProfileSwitchPercentInjector(): ActionProfileSwitchPercent
